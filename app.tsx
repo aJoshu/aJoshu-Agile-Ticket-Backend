@@ -9,7 +9,11 @@ const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 const port = 8080;
+const cors = require("cors");
 
+
+
+app.use(cors());
 app.use(express.json());
 
 app.post("/createSession", async (req, res) => {
