@@ -8,7 +8,7 @@ let map = {};
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
-const port = process.env.PORT || 8080;
+const port = 8080;
 
 app.use(express.json());
 
@@ -16,7 +16,7 @@ app.post("/createSession", async (req, res) => {
   const userID = req.body.userID;
   const userName = req.body.userName;
 
-  const user = { 
+  const user = {
     userID,
     userName,
     hasVoted: Boolean,
@@ -31,6 +31,7 @@ app.post("/createSession", async (req, res) => {
       sessions: {
         id: sessionID,
         members: [user],
+        showVote:false,
       },
     };
 
@@ -74,15 +75,57 @@ app.post("/joinSession", async (req, res) => {
   res.send();
 });
 
+app.post("/showVotes", (req, res) => {
+  const sessionID = req.body.sessionID;
+
+  const session = map[sessionID];
+  if (session) {
+    session.sessions.showVote = true;
+    map[sessionID] = session;
+
+    // Emit an event to all connected sockets to fetch the updated session data
+    io.emit(`fetchData-${sessionID}`, map[sessionID]);
+
+    res.send(`Show vote is set to true for session ${sessionID}`);
+  } else {
+    res.status(404).send("Session not found");
+  }
+});
+
+app.post("/clearVotes", (req, res) => {
+  const sessionID = req.body.sessionID;
+
+  const session = map[sessionID];
+  if (session) {
+    const members = session.sessions.members;
+
+    // Clear all the votes and hasVoted status for each member in the session
+    members.forEach((member) => {
+      member.vote = null;
+      member.hasVoted = false;
+    });
+    session.sessions.showVote = false;
+
+    map[sessionID] = session;
+
+    // Emit an event to all connected sockets to fetch the updated session data
+    io.emit(`fetchData-${sessionID}`, map[sessionID]);
+
+    res.send("Votes cleared for session " + sessionID);
+  } else {
+    res.status(404).send("Session not found");
+  }
+});
+
 // Route for getting user data
 app.get("/getUserID", (req, res) => {
   let test = map[req.body.userID];
   res.send(test);
 });
 
-app.get("/", (req, res) =>{
+app.get("/", (req, res) => {
   res.send(map);
-})
+});
 
 // Socket event for when a user votes
 io.on("connection", (socket) => {
